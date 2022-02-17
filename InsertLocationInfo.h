@@ -1,10 +1,10 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-17 21:17:48
+ * @LastEditTime: 2022-02-17 21:31:24
  * @LastEditors: qiulei
  * @Description: 
- * @FilePath: /src2src/ConditionalOperatorRewrite.h
+ * @FilePath: /src2src/InsertLocationInfo.h
  */
 #include <cstdio>
 #include <memory>
@@ -32,35 +32,23 @@
 using namespace clang;
 using namespace std;
 
-class ConditionalOperatorVisitor : public RecursiveASTVisitor<ConditionalOperatorVisitor> {
+class InsertInfoVisitor : public RecursiveASTVisitor<InsertInfoVisitor> {
 private:
-   Rewriter &TheRewriter;
-   ASTContext &TheContext;
-   long long int tempVarCounter = 0;
-   std::string prefixTmpName = "tmp";
+    std::vector<SourceRange> insertLocs;
 public:
-   ConditionalOperatorVisitor(Rewriter &R, ASTContext &C)
-      : TheRewriter(R), TheContext(C){
-      // for(auto scope:TheContext.getTraversalScope()){
-      //    //Record the CompoundStmt (the fronter one is the CompoundStmt which is bigger)
-      //    scope->getBody();
-      // }
-   }
+    InsertInfoVisitor(){}
 
-   bool VisitConditionalOperator(ConditionalOperator *condOp);
-   void RewriteCondOp(Expr *expr);
-   SourceLocation getInsertLocation(Stmt *s);
-   //Overide func
-   bool shouldTraversePostOrder() const { return true; }
-
-   std::string getPrefixTmpName(){return prefixTmpName;}
+    bool VisitCXXMethodDecl(CXXMethodDecl *mdecl);
+    void Visit(Stmt *s);
+    void RecordCompoundStmt(CompoundStmt *cstmt);
+    std::vector<SourceRange> getInsertLocations();
 };
 
-class ConditionalOperatorConsumer : public ASTConsumer {
+class InsertInfoConsumer : public ASTConsumer {
 private:
-   ConditionalOperatorVisitor mVisitor;
+   InsertInfoVisitor mVisitor;
 public:
-   ConditionalOperatorConsumer(Rewriter &R, ASTContext &C) : mVisitor(R, C){}
+   InsertInfoConsumer() : mVisitor(){}
 
    virtual bool HandleTopLevelDecl(DeclGroupRef DR) {
       for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)
@@ -69,5 +57,6 @@ public:
       return true;
    }
 
-   std::string getPrefixTmpName(){return mVisitor.getPrefixTmpName();}
+   //@TODO
+   std::vector<SourceRange> getInsertLocations();
 };

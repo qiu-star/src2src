@@ -1,92 +1,74 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 11:26:25
- * @LastEditTime: 2022-02-17 17:05:02
+ * @LastEditTime: 2022-02-17 21:20:02
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.cpp
  */
 
 #include "ConditionalOperatorRewrite.h"
-#include <queue>
-
-bool endWith(const string &str, const string &tail) {
-	return str.compare(str.size() - tail.size(), tail.size(), tail) == 0;
-}
- 
-bool startWith(const string &str, const string &head) {
-	return str.compare(0, head.size(), head) == 0;
-}
-
-bool ConditionalOperatorVisitor::Visit(Stmt *s){
-    for(auto *subStmt: s->children()){
-        if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt)){
-            if(binOp->isAssignmentOp()){
-                Visit(subStmt, binOp->getBeginLoc());
-                continue;
-            }
-        }
-        Visit(subStmt);
-    }
-    return true;
-}
 
 /**
- * @description: We need to insert the new temp var before the assign stmt
+ * @description: Get the insert location of s
  * @param {Stmt} *s
- * @param {SourceLocation} When we find ConditionOp, it is the location that we should insert the temp var at.
- * @return {*}
+ * @return {SourceLocation} the insert location of s
  */
-bool ConditionalOperatorVisitor::Visit(Stmt *s, SourceLocation insertLoc){
-    for(auto *subStmt: s->children()){
-        if(ConditionalOperator *condOp = dyn_cast<ConditionalOperator>(subStmt)){
-            VisitCondOp(condOp, insertLoc);
-            continue;
-        }
-        Visit(subStmt, insertLoc);
-    }
+SourceLocation ConditionalOperatorVisitor::getInsertLocation(Stmt *s){
+    //s->getBeginLoc is in the sourceRange of Compound
+    return s->getBeginLoc();
+
+    // const Stmt* ST = s;
+    // while (true) {
+    //     //get parents
+    //     const auto& parents = TheContext.getParents(*ST);
+    //     if ( parents.empty() ){
+    //         llvm::errs() << "Can not find parent\n";
+    //         return s->getBeginLoc();
+    //     }
+    
+    //     llvm::errs() << "find parent size=" << parents.size() << "\n";
+    //     ST = parents[0].get<Stmt>();
+    //     if (!ST)
+    //         return s->getBeginLoc();
+    //     if (isa<CompoundStmt>(ST))
+    //         break;
+    // }
+    // return ST->getBeginLoc();
+}
+
+bool ConditionalOperatorVisitor::VisitConditionalOperator(ConditionalOperator *condOp){
+    // condOp->dump();
+    SourceRange srcRange = SourceRange(condOp->getBeginLoc(), condOp->getEndLoc());
+    std::string exprSrc = TheRewriter.getRewrittenText(srcRange);
+    if(exprSrc == "")
+        return true;
+    
+    TheRewriter.InsertTextBefore(getInsertLocation(condOp), ";");
+    //     cout<<"true"<<endl;
+    // else
+    //     cout<<"false"<<endl;
+    // ////////Replace the true Expr////////
+    // RewriteCondOp(condOp->getTrueExpr());
+    
+    // ////////Replace the false Expr////////
+    // RewriteCondOp(condOp->getFalseExpr());
+
     return true;
 }
 
-bool ConditionalOperatorVisitor::VisitCXXMethodDecl(CXXMethodDecl *mdecl){
-    FunctionDecl * preDecl = mdecl->getPreviousDecl();
-    if(!preDecl)
-        return false;
-    if(!startWith(preDecl->getDeclName().getAsString(), "_sequent__TOP"))
-        return false;
-    
-    //Visit ConditionalOperator
-    queue<Stmt*> visitQ;
+void ConditionalOperatorVisitor::RewriteCondOp(Expr *expr){
+    expr->dump();
+    // SourceRange srcRange = SourceRange(expr->getBeginLoc(), expr->getEndLoc());
+    // QualType t = expr->getType();
+    // std::string type = t.getAsString();
 
-    for(auto *subStmt :mdecl->getBody()->children()){
-        Visit(subStmt);
-    }
-    return false;
-}
+    // std::string exprSrc = TheRewriter.getRewrittenText(srcRange);
+    // cout<<exprSrc<<endl;
 
-bool ConditionalOperatorVisitor::VisitCondOp(ConditionalOperator *condOp, SourceLocation insertLoc){
-    ////////Replace the true Expr////////
-    RewriteCondOp(condOp->getTrueExpr(), insertLoc);
-    //Then check the true Expr whether have condOP
-    Visit(condOp->getTrueExpr(), insertLoc);
-    
-    ////////Replace the false Expr////////
-    RewriteCondOp(condOp->getFalseExpr(), insertLoc);
-    //@TODO: Then check the false Expr whether have condOP
-
-    return false;
-}
-
-void ConditionalOperatorVisitor::RewriteCondOp(Expr *expr, SourceLocation insertLoc){
-    SourceRange srcRange = SourceRange(expr->getBeginLoc(), expr->getEndLoc());
-    QualType t = expr->getType();
-    std::string type = t.getAsString();
-
-    std::string exprSrc = TheRewriter.getRewrittenText(srcRange);
-
-    ///Format: Type tmpxx = trueExpr
-    std::string modifySrc = type+" "+prefixTmpName+to_string(tempVarCounter)+" = "+exprSrc+";\n";
-    TheRewriter.InsertTextBefore(insertLoc, modifySrc);
-    // TheRewriter.ReplaceText(srcRange, prefixTmpName+to_string(tempVarCounter));
-    tempVarCounter++;
+    // ///Format: Type tmpxx = trueExpr
+    // std::string modifySrc = type+" "+prefixTmpName+to_string(tempVarCounter)+" = "+exprSrc+";\n";
+    // TheRewriter.InsertTextBefore(insertLoc, modifySrc);
+    // // TheRewriter.ReplaceText(srcRange, prefixTmpName+to_string(tempVarCounter));
+    // tempVarCounter++;
 }

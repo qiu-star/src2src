@@ -1,3 +1,11 @@
+/*
+ * @Author: qiulei
+ * @Date: 2022-02-16 10:17:41
+ * @LastEditTime: 2022-02-17 20:41:31
+ * @LastEditors: qiulei
+ * @Description: 
+ * @FilePath: /src2src/kernel/kernel.cpp
+ */
 // Verilated -*- C++ -*-
 // DESCRIPTION: Verilator output: Design implementation internals
 // See VSimTop.h for the primary calling header

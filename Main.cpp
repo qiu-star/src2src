@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 19:14:02
- * @LastEditTime: 2022-02-17 15:34:32
+ * @LastEditTime: 2022-02-17 21:44:31
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/Main.cpp
@@ -69,28 +69,8 @@ void set_lang_opts(clang::CompilerInstance & ci) {
     ci.getLangOpts().CPlusPlus17 = true ;
 }
 
-int main(int argc, char * argv[]){
-    llvm::cl::SetVersionPrinter([](llvm::raw_ostream& stream) {stream<< "Trick Interface Code Generator (trick-ICG) '\n'";});
-    /**
-     * Gather all of the command line arguments into lists of include directories, defines, and input files.
-     * All other arguments will be ignored.
-     *
-     * Filter out -W because of LLVM cl option that has been enabled and cannot be disabled in LLVM 10 when linking libclang-cpp.so.
-     * TODO: Troubleshoot or contact LLVM for a fix.  
-     */
-    std::vector<const char *> filtered_args;
-    for ( unsigned int ii = 0;  ii < argc ; ii++ ) {
-        if( strncmp(argv[ii], "-W", 2) ) {
-            filtered_args.push_back(argv[ii]);
-        }
-    }
-
-    llvm::cl::ParseCommandLineOptions(filtered_args.size(), filtered_args.data());
-
-    if (input_file_names.empty()) {
-        std::cerr << "No header file specified" << std::endl;
-        return 1;
-    }
+//@TODO: get the insertLocationInfo
+void getInsertLocations(){
     clang::CompilerInstance ci ;
     ci.createDiagnostics();
     ci.getDiagnosticOpts().ShowColors = 1 ;
@@ -131,14 +111,114 @@ int main(int argc, char * argv[]){
     
     pp.getBuiltinInfo().initializeBuiltins(pp.getIdentifierTable(), pp.getLangOpts());
 
+    ci.createASTContext();
     // Tell the compiler to use our consumer
     Rewriter rewriter;
     SourceManager &SourceMgr = ci.getSourceManager();
     rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
-    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter);
+    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, ci.getASTContext());
     ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
 
+    
+    ci.createSema(clang::TU_Prefix, NULL);
+
+    // Get the full path of the file to be read
+    char buffer[input_file_names[0].size() + 1];
+    strcpy(buffer, input_file_names[0].c_str());
+    std::string path(dirname(buffer));
+    path += "/";
+    strcpy(buffer, input_file_names[0].c_str());
+    path += basename(buffer);
+    char* inputFilePath = almostRealPath(path);
+
+    struct stat dummy;
+    if (stat(inputFilePath, &dummy)) {
+        std::cerr << "Could not open file " << inputFilePath << std::endl;
+        exit(-1);
+    }
+    // Open up the input file and parse it
+    const clang::FileEntry* fileEntry = ci.getFileManager().getFile(inputFilePath).get();
+    free(inputFilePath);
+    ci.getSourceManager().setMainFileID(ci.getSourceManager().createFileID(fileEntry, clang::SourceLocation(), clang::SrcMgr::C_User));
+    ci.getDiagnosticClient().BeginSourceFile(ci.getLangOpts(), &ci.getPreprocessor());
+    clang::ParseAST(ci.getSema());
+    ci.getDiagnosticClient().EndSourceFile();
+}
+
+int main(int argc, char * argv[]){
+    llvm::cl::SetVersionPrinter([](llvm::raw_ostream& stream) {stream<< "Trick Interface Code Generator (trick-ICG) '\n'";});
+    /**
+     * Gather all of the command line arguments into lists of include directories, defines, and input files.
+     * All other arguments will be ignored.
+     *
+     * Filter out -W because of LLVM cl option that has been enabled and cannot be disabled in LLVM 10 when linking libclang-cpp.so.
+     * TODO: Troubleshoot or contact LLVM for a fix.  
+     */
+    std::vector<const char *> filtered_args;
+    for ( unsigned int ii = 0;  ii < argc ; ii++ ) {
+        if( strncmp(argv[ii], "-W", 2) ) {
+            filtered_args.push_back(argv[ii]);
+        }
+    }
+
+    llvm::cl::ParseCommandLineOptions(filtered_args.size(), filtered_args.data());
+
+    if (input_file_names.empty()) {
+        std::cerr << "No header file specified" << std::endl;
+        return 1;
+    }
+
+    getInsertLocations();
+
+    clang::CompilerInstance ci ;
+    ci.createDiagnostics();
+    ci.getDiagnosticOpts().ShowColors = 1 ;
+    ci.getDiagnostics().setIgnoreAllWarnings(true) ;
+    set_lang_opts(ci);
+
+    // Create all of the necessary managers.
+    ci.createFileManager();
+    ci.createSourceManager(ci.getFileManager());
+
+    // Tell the preprocessor to use its default predefines
+    clang::PreprocessorOptions & ppo = ci.getPreprocessorOpts() ;
+    ppo.UsePredefines = true;
+
+    clang::TargetOptions to;
+    if ( m32 ) {
+        to.Triple = llvm::Triple(llvm::sys::getDefaultTargetTriple()).get32BitArchVariant().str();
+    } else {
+        to.Triple = llvm::sys::getDefaultTargetTriple();
+    }
+    std::shared_ptr<clang::TargetOptions> shared_to  = std::make_shared<clang::TargetOptions>(to) ;
+    clang::TargetInfo *pti = clang::TargetInfo::CreateTargetInfo(ci.getDiagnostics(), shared_to);
+    ci.setTarget(pti);
+    ci.createPreprocessor(clang::TU_Complete);
+
+    llvm::Triple trip (to.Triple) ;
+    clang::CompilerInvocation::setLangDefaults(ci.getLangOpts(), clang::Language::CXX, trip, ppo) ;
+
+    // setting the language defaults clears some of the language opts, set them again.
+    set_lang_opts(ci);
+
+    clang::Preprocessor& pp = ci.getPreprocessor();
+    clang::InitializePreprocessor(pp, ppo, ci.getPCHContainerReader(), ci.getFrontendOpts());
+
+    // Add all of the include directories to the preprocessor
+    HeaderSearchDirs hsd(ci.getPreprocessor().getHeaderSearchInfo(), ci.getHeaderSearchOpts(), pp, sim_services_flag);
+    hsd.addSearchDirs(include_dirs, isystem_dirs);
+    
+    pp.getBuiltinInfo().initializeBuiltins(pp.getIdentifierTable(), pp.getLangOpts());
+
     ci.createASTContext();
+    // Tell the compiler to use our consumer
+    Rewriter rewriter;
+    SourceManager &SourceMgr = ci.getSourceManager();
+    rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
+    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, ci.getASTContext());
+    ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
+
+    
     ci.createSema(clang::TU_Prefix, NULL);
 
     // Get the full path of the file to be read
