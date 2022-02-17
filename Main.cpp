@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 19:14:02
- * @LastEditTime: 2022-02-16 20:09:21
+ * @LastEditTime: 2022-02-17 15:34:32
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/Main.cpp
@@ -133,7 +133,8 @@ int main(int argc, char * argv[]){
 
     // Tell the compiler to use our consumer
     Rewriter rewriter;
-    rewriter.setSourceMgr(ci.getSourceManager(), ci.getLangOpts());
+    SourceManager &SourceMgr = ci.getSourceManager();
+    rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
     ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter);
     ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
 
@@ -162,6 +163,9 @@ int main(int argc, char * argv[]){
     clang::ParseAST(ci.getSema());
     ci.getDiagnosticClient().EndSourceFile();
 
-
+    //Rewrite the source code
+    const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
+    llvm::outs()<<string(rb->begin(), rb->end());
+    
     return 0;
 }

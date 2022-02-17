@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-17 12:32:29
+ * @LastEditTime: 2022-02-17 17:12:50
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.h
@@ -35,13 +35,19 @@ using namespace std;
 class ConditionalOperatorVisitor : public RecursiveASTVisitor<ConditionalOperatorVisitor> {
 private:
    Rewriter &TheRewriter;
+   long long int tempVarCounter = 0;
+   std::string prefixTmpName = "tmp";
 public:
    ConditionalOperatorVisitor(Rewriter &R)
       : TheRewriter(R){}
 
    bool Visit(Stmt *s);
+   bool Visit(Stmt *s, SourceLocation insertLoc);
    bool VisitCXXMethodDecl(CXXMethodDecl *mdecl);
-   bool VisitCondOp(ConditionalOperator *condOp);
+   bool VisitCondOp(ConditionalOperator *condOp, SourceLocation insertLoc);
+   void RewriteCondOp(Expr *expr, SourceLocation insertLoc);
+   //Overide func
+   bool shouldTraversePostOrder() const { return true; }
 };
 
 class ConditionalOperatorConsumer : public ASTConsumer {
