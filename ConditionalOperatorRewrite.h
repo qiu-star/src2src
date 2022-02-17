@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-17 11:03:31
+ * @LastEditTime: 2022-02-17 12:32:29
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.h
@@ -39,8 +39,9 @@ public:
    ConditionalOperatorVisitor(Rewriter &R)
       : TheRewriter(R){}
 
+   bool Visit(Stmt *s);
    bool VisitCXXMethodDecl(CXXMethodDecl *mdecl);
-   bool VisitConditionalOperator(ConditionalOperator *condOp);
+   bool VisitCondOp(ConditionalOperator *condOp);
 };
 
 class ConditionalOperatorConsumer : public ASTConsumer {
