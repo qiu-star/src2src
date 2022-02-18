@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-17 21:17:48
+ * @LastEditTime: 2022-02-18 15:17:31
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.h
@@ -35,39 +35,45 @@ using namespace std;
 class ConditionalOperatorVisitor : public RecursiveASTVisitor<ConditionalOperatorVisitor> {
 private:
    Rewriter &TheRewriter;
-   ASTContext &TheContext;
+   std::vector<SourceRange>  &InsertLocs;
+
+   std::vector<std::pair<std::string, SourceLocation>> NeedInsertSrcAndLocs;
+
+   //Store the rhs of condOP
+   long long int tempRHSCounter = 0;
+   std::string prefixRHSName = "rhs";
+
+   //Store the condOp
    long long int tempVarCounter = 0;
-   std::string prefixTmpName = "tmp";
+   std::string prefixTempName = "tmp";
+   
 public:
-   ConditionalOperatorVisitor(Rewriter &R, ASTContext &C)
-      : TheRewriter(R), TheContext(C){
-      // for(auto scope:TheContext.getTraversalScope()){
-      //    //Record the CompoundStmt (the fronter one is the CompoundStmt which is bigger)
-      //    scope->getBody();
-      // }
-   }
+   ConditionalOperatorVisitor(Rewriter &R, std::vector<SourceRange> &V)
+      : TheRewriter(R), InsertLocs(V){}
 
    bool VisitConditionalOperator(ConditionalOperator *condOp);
-   void RewriteCondOp(Expr *expr);
+   void RewriteCondOpRHS(Expr *expr, SourceLocation insertLoc);
+   void RewriteCondOp(ConditionalOperator *condOp, SourceLocation insertLoc);
    SourceLocation getInsertLocation(Stmt *s);
    //Overide func
    bool shouldTraversePostOrder() const { return true; }
-
-   std::string getPrefixTmpName(){return prefixTmpName;}
+   bool Rewrite();
 };
 
 class ConditionalOperatorConsumer : public ASTConsumer {
 private:
    ConditionalOperatorVisitor mVisitor;
+   bool RewriteSuccessful;
 public:
-   ConditionalOperatorConsumer(Rewriter &R, ASTContext &C) : mVisitor(R, C){}
+   ConditionalOperatorConsumer(Rewriter &R, std::vector<SourceRange> &V) : mVisitor(R, V){}
 
    virtual bool HandleTopLevelDecl(DeclGroupRef DR) {
       for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)
          // Traverse the declaration using our AST visitor.
          mVisitor.TraverseDecl(*b);
+      RewriteSuccessful = mVisitor.Rewrite();
       return true;
    }
 
-   std::string getPrefixTmpName(){return mVisitor.getPrefixTmpName();}
+   bool IsRewriteSuccessful(){return RewriteSuccessful;}
 };

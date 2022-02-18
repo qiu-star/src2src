@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 19:14:02
- * @LastEditTime: 2022-02-17 21:44:31
+ * @LastEditTime: 2022-02-18 15:17:14
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/Main.cpp
@@ -31,6 +31,7 @@
 
 #include "HeaderSearchDirs.hh"
 #include "ConditionalOperatorRewrite.h"
+#include "InsertLocationInfo.h"
 #include "Utilities.hh"
 
 /* Command line arguments.  These work better as globals, as suggested in llvm/CommandLine documentation */
@@ -69,9 +70,7 @@ void set_lang_opts(clang::CompilerInstance & ci) {
     ci.getLangOpts().CPlusPlus17 = true ;
 }
 
-//@TODO: get the insertLocationInfo
-void getInsertLocations(){
-    clang::CompilerInstance ci ;
+void init(clang::CompilerInstance & ci){
     ci.createDiagnostics();
     ci.getDiagnosticOpts().ShowColors = 1 ;
     ci.getDiagnostics().setIgnoreAllWarnings(true) ;
@@ -110,18 +109,9 @@ void getInsertLocations(){
     hsd.addSearchDirs(include_dirs, isystem_dirs);
     
     pp.getBuiltinInfo().initializeBuiltins(pp.getIdentifierTable(), pp.getLangOpts());
+}
 
-    ci.createASTContext();
-    // Tell the compiler to use our consumer
-    Rewriter rewriter;
-    SourceManager &SourceMgr = ci.getSourceManager();
-    rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
-    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, ci.getASTContext());
-    ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
-
-    
-    ci.createSema(clang::TU_Prefix, NULL);
-
+void parse(clang::CompilerInstance & ci){
     // Get the full path of the file to be read
     char buffer[input_file_names[0].size() + 1];
     strcpy(buffer, input_file_names[0].c_str());
@@ -143,6 +133,54 @@ void getInsertLocations(){
     ci.getDiagnosticClient().BeginSourceFile(ci.getLangOpts(), &ci.getPreprocessor());
     clang::ParseAST(ci.getSema());
     ci.getDiagnosticClient().EndSourceFile();
+}
+
+std::vector<SourceRange> getStmt2InsertLoc(){
+    clang::CompilerInstance ci ;
+    init(ci);
+
+    ci.createASTContext();
+    // Tell the compiler to use our consumer
+    Rewriter rewriter;
+    SourceManager &SourceMgr = ci.getSourceManager();
+    rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
+    InsertInfoConsumer* astConsumer = new InsertInfoConsumer();
+    ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
+
+    
+    ci.createSema(clang::TU_Prefix, NULL);
+
+    parse(ci);
+    
+    // for(auto &KV: astConsumer->getStmt2InsertLoc()){
+    //     cout<<KV.second.getRawEncoding() <<endl;
+    // }
+    // SourceMgr.getComposedLoc(SourceMgr .getMainFileID(),1228).dump(SourceMgr);
+    return astConsumer->getInsertLocs();
+}
+
+void rewrite(std::vector<SourceRange> InsertLocs){
+    clang::CompilerInstance ci ;
+    init(ci);
+
+    ci.createASTContext();
+    // Tell the compiler to use our consumer
+    Rewriter rewriter;
+    SourceManager &SourceMgr = ci.getSourceManager();
+    rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
+    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, InsertLocs);
+    ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
+
+    
+    ci.createSema(clang::TU_Prefix, NULL);
+
+    parse(ci);
+
+    //Rewrite the source code
+    if(astConsumer->IsRewriteSuccessful()){
+        const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
+        llvm::outs()<<string(rb->begin(), rb->end());
+    }
 }
 
 int main(int argc, char * argv[]){
@@ -168,84 +206,8 @@ int main(int argc, char * argv[]){
         return 1;
     }
 
-    getInsertLocations();
-
-    clang::CompilerInstance ci ;
-    ci.createDiagnostics();
-    ci.getDiagnosticOpts().ShowColors = 1 ;
-    ci.getDiagnostics().setIgnoreAllWarnings(true) ;
-    set_lang_opts(ci);
-
-    // Create all of the necessary managers.
-    ci.createFileManager();
-    ci.createSourceManager(ci.getFileManager());
-
-    // Tell the preprocessor to use its default predefines
-    clang::PreprocessorOptions & ppo = ci.getPreprocessorOpts() ;
-    ppo.UsePredefines = true;
-
-    clang::TargetOptions to;
-    if ( m32 ) {
-        to.Triple = llvm::Triple(llvm::sys::getDefaultTargetTriple()).get32BitArchVariant().str();
-    } else {
-        to.Triple = llvm::sys::getDefaultTargetTriple();
-    }
-    std::shared_ptr<clang::TargetOptions> shared_to  = std::make_shared<clang::TargetOptions>(to) ;
-    clang::TargetInfo *pti = clang::TargetInfo::CreateTargetInfo(ci.getDiagnostics(), shared_to);
-    ci.setTarget(pti);
-    ci.createPreprocessor(clang::TU_Complete);
-
-    llvm::Triple trip (to.Triple) ;
-    clang::CompilerInvocation::setLangDefaults(ci.getLangOpts(), clang::Language::CXX, trip, ppo) ;
-
-    // setting the language defaults clears some of the language opts, set them again.
-    set_lang_opts(ci);
-
-    clang::Preprocessor& pp = ci.getPreprocessor();
-    clang::InitializePreprocessor(pp, ppo, ci.getPCHContainerReader(), ci.getFrontendOpts());
-
-    // Add all of the include directories to the preprocessor
-    HeaderSearchDirs hsd(ci.getPreprocessor().getHeaderSearchInfo(), ci.getHeaderSearchOpts(), pp, sim_services_flag);
-    hsd.addSearchDirs(include_dirs, isystem_dirs);
-    
-    pp.getBuiltinInfo().initializeBuiltins(pp.getIdentifierTable(), pp.getLangOpts());
-
-    ci.createASTContext();
-    // Tell the compiler to use our consumer
-    Rewriter rewriter;
-    SourceManager &SourceMgr = ci.getSourceManager();
-    rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
-    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, ci.getASTContext());
-    ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
-
-    
-    ci.createSema(clang::TU_Prefix, NULL);
-
-    // Get the full path of the file to be read
-    char buffer[input_file_names[0].size() + 1];
-    strcpy(buffer, input_file_names[0].c_str());
-    std::string path(dirname(buffer));
-    path += "/";
-    strcpy(buffer, input_file_names[0].c_str());
-    path += basename(buffer);
-    char* inputFilePath = almostRealPath(path);
-
-    struct stat dummy;
-    if (stat(inputFilePath, &dummy)) {
-        std::cerr << "Could not open file " << inputFilePath << std::endl;
-        exit(-1);
-    }
-    // Open up the input file and parse it
-    const clang::FileEntry* fileEntry = ci.getFileManager().getFile(inputFilePath).get();
-    free(inputFilePath);
-    ci.getSourceManager().setMainFileID(ci.getSourceManager().createFileID(fileEntry, clang::SourceLocation(), clang::SrcMgr::C_User));
-    ci.getDiagnosticClient().BeginSourceFile(ci.getLangOpts(), &ci.getPreprocessor());
-    clang::ParseAST(ci.getSema());
-    ci.getDiagnosticClient().EndSourceFile();
-
-    //Rewrite the source code
-    const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
-    llvm::outs()<<string(rb->begin(), rb->end());
+    std::vector<SourceRange>  InsertLocs = getStmt2InsertLoc();
+    rewrite(InsertLocs);
     
     return 0;
 }
