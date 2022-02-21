@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 11:26:25
- * @LastEditTime: 2022-02-18 16:10:28
+ * @LastEditTime: 2022-02-21 10:57:16
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.cpp
@@ -28,8 +28,8 @@ bool ConditionalOperatorVisitor::VisitConditionalOperator(ConditionalOperator *c
     ////////Replace the false Expr////////
     RewriteCondOpRHS(condOp->getFalseExpr(), insertLoc);
 
-    ////////Replace the condOP////////
-    RewriteCondOp(condOp, insertLoc);
+    // ////////Replace the condOP////////
+    // RewriteCondOp(condOp, insertLoc);
     return true;
 }
 
@@ -48,11 +48,14 @@ void ConditionalOperatorVisitor::RewriteCondOpRHS(Expr *expr, SourceLocation ins
 }
 
 void ConditionalOperatorVisitor::RewriteCondOp(ConditionalOperator *condOp, SourceLocation insertLoc){
+    //@TODO: After replace the text in getRewrittenText, TheRewriter.getRewrittenText(srcRange) go wrong
+    // to fix this issue, we use the offset.
     SourceRange srcRange = SourceRange(condOp->getBeginLoc(), condOp->getEndLoc());
     QualType t = condOp->getType();
     std::string type = t.getAsString();
 
     std::string condOpSrc = TheRewriter.getRewrittenText(srcRange);
+    // if(tempVarCounter <= 1) cout<<condOpSrc<<endl;
 
     ///Format: Type tmpxx = condOp
     std::string modifySrc = type+" "+prefixTempName+to_string(tempVarCounter)+" = "+condOpSrc+";\n";
