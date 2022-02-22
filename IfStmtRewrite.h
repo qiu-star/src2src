@@ -1,10 +1,10 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-22 16:10:36
+ * @LastEditTime: 2022-02-22 18:16:12
  * @LastEditors: qiulei
  * @Description: 
- * @FilePath: /src2src/ConditionalOperatorRewrite.h
+ * @FilePath: /src2src/IfStmtRewrite.h
  */
 #include <cstdio>
 #include <memory>
@@ -32,40 +32,29 @@
 using namespace clang;
 using namespace std;
 
-class ConditionalOperatorVisitor : public RecursiveASTVisitor<ConditionalOperatorVisitor> {
+class IfStmtVisitor : public RecursiveASTVisitor<IfStmtVisitor> {
 private:
    Rewriter &TheRewriter;
-   std::vector<SourceRange>  &InsertLocs;
-
-   std::vector<std::pair<std::string, SourceLocation>> NeedInsertSrcAndLocs;
-
-   //Store the rhs of condOP
-   long long int tempRHSCounter = 0;
-   std::string prefixRHSName = "rhs";
-
-   //Store the condOp
-   long long int tempVarCounter = 0;
-   std::string prefixTempName = "tmp";
-   
+   bool isRewriten;
 public:
-   ConditionalOperatorVisitor(Rewriter &R, std::vector<SourceRange> &V)
-      : TheRewriter(R), InsertLocs(V){}
+   IfStmtVisitor(Rewriter &R)
+      : TheRewriter(R),isRewriten(false){}
 
-   bool VisitConditionalOperator(ConditionalOperator *condOp);
-   void RewriteCondOpRHS(Expr *expr, SourceLocation insertLoc);
-   void RewriteCondOp(ConditionalOperator *condOp, SourceLocation insertLoc);
+   bool VisitIfStmt(IfStmt *ifStmt);
+   bool hasSingleAssignStmtWithoutElse(IfStmt *ifStmt);
+   void RewriteIfStmt(Stmt *s, SourceLocation insertLoc);
    SourceLocation getInsertLocation(Stmt *s);
    //Overide func
    bool shouldTraversePostOrder() const { return true; }
    bool Rewrite();
 };
 
-class ConditionalOperatorConsumer : public ASTConsumer {
+class IfStmtConsumer : public ASTConsumer {
 private:
-   ConditionalOperatorVisitor mVisitor;
+   IfStmtVisitor mVisitor;
    bool RewriteSuccessful;
 public:
-   ConditionalOperatorConsumer(Rewriter &R, std::vector<SourceRange> &V) : mVisitor(R, V){}
+   IfStmtConsumer(Rewriter &R) : mVisitor(R){}
 
    virtual bool HandleTopLevelDecl(DeclGroupRef DR) {
       for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)

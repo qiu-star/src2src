@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 19:14:02
- * @LastEditTime: 2022-02-18 15:17:14
+ * @LastEditTime: 2022-02-22 16:12:51
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/Main.cpp
@@ -31,6 +31,7 @@
 
 #include "HeaderSearchDirs.hh"
 #include "ConditionalOperatorRewrite.h"
+#include "IfStmtRewrite.h"
 #include "InsertLocationInfo.h"
 #include "Utilities.hh"
 
@@ -55,6 +56,9 @@ llvm::cl::opt<bool> global_compat15("c", llvm::cl::desc("Print the offsetof calc
 llvm::cl::opt<llvm::cl::boolOrDefault> print_trick_icg("print-TRICK-ICG", llvm::cl::desc("Print warnings where TRICK_ICG may cause io_src inconsistencies")) ;
 llvm::cl::alias compat15_alias ("compat15" , llvm::cl::desc("Alias for -c") , llvm::cl::aliasopt(global_compat15)) ;
 llvm::cl::opt<bool> m32("m32", llvm::cl::desc("Generate io code for use with 32bit mode"), llvm::cl::init(false), llvm::cl::ZeroOrMore) ;
+
+llvm::cl::opt<bool> rewriteConditionOp("rCondOP", llvm::cl::desc("Transform conditional Op"), llvm::cl::init(false));
+llvm::cl::opt<bool> rewriteIfStmt("rIf", llvm::cl::desc("Transform IfStmt"), llvm::cl::init(false));
 
 void set_lang_opts(clang::CompilerInstance & ci) {
     ci.getLangOpts().CXXExceptions = true ;
@@ -151,15 +155,10 @@ std::vector<SourceRange> getStmt2InsertLoc(){
     ci.createSema(clang::TU_Prefix, NULL);
 
     parse(ci);
-    
-    // for(auto &KV: astConsumer->getStmt2InsertLoc()){
-    //     cout<<KV.second.getRawEncoding() <<endl;
-    // }
-    // SourceMgr.getComposedLoc(SourceMgr .getMainFileID(),1228).dump(SourceMgr);
     return astConsumer->getInsertLocs();
 }
 
-void rewrite(std::vector<SourceRange> InsertLocs){
+void rewriteCondOp(std::vector<SourceRange> InsertLocs){
     clang::CompilerInstance ci ;
     init(ci);
 
@@ -169,6 +168,30 @@ void rewrite(std::vector<SourceRange> InsertLocs){
     SourceManager &SourceMgr = ci.getSourceManager();
     rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
     ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, InsertLocs);
+    ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
+
+    
+    ci.createSema(clang::TU_Prefix, NULL);
+
+    parse(ci);
+
+    //Rewrite the source code
+    if(astConsumer->IsRewriteSuccessful()){
+        const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
+        llvm::outs()<<string(rb->begin(), rb->end());
+    }
+}
+
+void rewriteIf(){
+    clang::CompilerInstance ci ;
+    init(ci);
+
+    ci.createASTContext();
+    // Tell the compiler to use our consumer
+    Rewriter rewriter;
+    SourceManager &SourceMgr = ci.getSourceManager();
+    rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
+    IfStmtConsumer* astConsumer = new IfStmtConsumer(rewriter);
     ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
 
     
@@ -206,8 +229,14 @@ int main(int argc, char * argv[]){
         return 1;
     }
 
-    std::vector<SourceRange>  InsertLocs = getStmt2InsertLoc();
-    rewrite(InsertLocs);
+    if(rewriteConditionOp){
+        std::vector<SourceRange>  InsertLocs = getStmt2InsertLoc();
+        rewriteCondOp(InsertLocs);
+    }
+
+    if(rewriteIfStmt){
+        rewriteIf();
+    }
     
     return 0;
 }
