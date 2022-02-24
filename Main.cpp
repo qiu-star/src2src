@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 19:14:02
- * @LastEditTime: 2022-02-22 16:12:51
+ * @LastEditTime: 2022-02-24 14:35:15
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/Main.cpp
@@ -178,7 +178,8 @@ void rewriteCondOp(std::vector<SourceRange> InsertLocs){
     //Rewrite the source code
     if(astConsumer->IsRewriteSuccessful()){
         const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
-        llvm::outs()<<string(rb->begin(), rb->end());
+        if(rb)
+            llvm::outs()<<string(rb->begin(), rb->end());
     }
 }
 
@@ -202,7 +203,8 @@ void rewriteIf(){
     //Rewrite the source code
     if(astConsumer->IsRewriteSuccessful()){
         const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
-        llvm::outs()<<string(rb->begin(), rb->end());
+        if(rb)
+            llvm::outs()<<string(rb->begin(), rb->end());
     }
 }
 

@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-18 09:44:00
- * @LastEditTime: 2022-02-18 13:01:24
+ * @LastEditTime: 2022-02-24 16:17:22
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/InsertLocationInfo.cpp
@@ -18,15 +18,15 @@ bool startWith(const string &str, const string &head) {
 
 void InsertInfoVisitor::Visit(Stmt *s){
     for(auto *subStmt: s->children()){
-        if(CompoundStmt *cs = dyn_cast<CompoundStmt>(subStmt))
-            Visit(subStmt, SourceRange(cs->getBeginLoc(), cs->getEndLoc()));
+        if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt))
+            Visit(subStmt, SourceRange(binOp->getBeginLoc(), binOp->getEndLoc()));
         else
             Visit(subStmt);
     }
 }
 
 /**
- * @description: We need to insert the new temp var at CompoundStmt
+ * @description: We need to insert the new temp var before BinaryOperator
  * @param {Stmt} *s
  * @param {SourceRange} When we find ConditionOp, it is the location that we should insert the temp var at.
  */
@@ -36,8 +36,8 @@ void InsertInfoVisitor::Visit(Stmt *s, SourceRange insertSourceRange){
             addInsertLocs(insertSourceRange);
             Visit(condOp, insertSourceRange);
         }
-        else if(CompoundStmt *cs = dyn_cast<CompoundStmt>(subStmt)){
-            Visit(subStmt, SourceRange(cs->getBeginLoc(), cs->getEndLoc()));
+        else if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt)){
+            Visit(subStmt, SourceRange(binOp->getBeginLoc(), binOp->getEndLoc()));
         }
         else
             Visit(subStmt, insertSourceRange);
@@ -52,7 +52,10 @@ bool InsertInfoVisitor::VisitCXXMethodDecl(CXXMethodDecl *mdecl){
         return false;
 
     for(auto *subStmt :mdecl->getBody()->children()){
-        Visit(subStmt);
+        if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt))
+            Visit(subStmt, SourceRange(binOp->getBeginLoc(), binOp->getEndLoc()));
+        else
+            Visit(subStmt);
     }
     return false;
 }

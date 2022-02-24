@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 11:26:25
- * @LastEditTime: 2022-02-21 10:57:16
+ * @LastEditTime: 2022-02-24 16:24:32
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.cpp
@@ -91,7 +91,7 @@ SourceLocation ConditionalOperatorVisitor::getInsertLocation(Stmt *s){
         if(InsertLocs[i].fullyContains(SourceRange(s->getBeginLoc(), s->getEndLoc()))){
             //InsertLocs[i].getBegin() is the staert of CompoundStmt, so we should insert
             //the tmp after it.
-            return InsertLocs[i].getBegin().getLocWithOffset(4);
+            return InsertLocs[i].getBegin();
         }
     }
     return s->getBeginLoc();
