@@ -1,4 +1,4 @@
-clang++  -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -O2 -c -o kernel.o kernel.cpp -Xclang -ast-dump
+clang++  -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -O2 -c -o kernel/kernel.o kernel/kernel.cpp -Xclang -ast-dump
 
 clang++  -O2 -c -o test-origin.o test-origin.cpp -Xclang -ast-dump &> ast
 

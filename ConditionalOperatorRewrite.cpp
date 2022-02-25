@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 11:26:25
- * @LastEditTime: 2022-02-24 16:24:32
+ * @LastEditTime: 2022-02-25 16:00:42
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.cpp
@@ -20,7 +20,7 @@ bool ConditionalOperatorVisitor::VisitConditionalOperator(ConditionalOperator *c
     //Can't find where to insert
     SourceLocation insertLoc = getInsertLocation(condOp);
     if(insertLoc == condOp->getBeginLoc())
-        return false;
+        return true;
     
     ////////Replace the true Expr////////
     RewriteCondOpRHS(condOp->getTrueExpr(), insertLoc);
@@ -33,11 +33,59 @@ bool ConditionalOperatorVisitor::VisitConditionalOperator(ConditionalOperator *c
     return true;
 }
 
+// bool ConditionalOperatorVisitor::VisitCXXMemberCallExpr(CXXMemberCallExpr *callExpr){
+//     if(NeedInsertSrcAndLocs.empty())
+//         return true;
+    
+//     for(int i=NeedInsertSrcAndLocs.size()-1; i>=0; i--){
+//         auto &p = NeedInsertSrcAndLocs[i];
+//         std::string modifySrc = p.first;
+//         SourceLocation insertLoc = callExpr->getBeginLoc();
+//         TheRewriter.InsertTextBefore(insertLoc, modifySrc);
+//     }
+//     NeedInsertSrcAndLocs.clear();
+//     return true;
+// }
+
+// bool ConditionalOperatorVisitor::VisitCallExpr(CallExpr *callExpr){
+//     if(NeedInsertSrcAndLocs.empty())
+//         return true;
+    
+//     for(int i=NeedInsertSrcAndLocs.size()-1; i>=0; i--){
+//         auto &p = NeedInsertSrcAndLocs[i];
+//         std::string modifySrc = p.first;
+//         SourceLocation insertLoc = callExpr->getBeginLoc();
+//         TheRewriter.InsertTextBefore(insertLoc, modifySrc);
+//     }
+//     NeedInsertSrcAndLocs.clear();
+//     return true;
+// }
+
+
+bool ConditionalOperatorVisitor::VisitBinaryOperator(BinaryOperator *binOp){
+    if(!binOp->isAssignmentOp())
+        return true;
+    
+    if(NeedInsertSrcAndLocs.empty())
+        return true;
+    
+    for(int i=NeedInsertSrcAndLocs.size()-1; i>=0; i--){
+        auto &p = NeedInsertSrcAndLocs[i];
+        std::string modifySrc = p.first;
+        SourceLocation insertLoc = binOp->getBeginLoc();
+        TheRewriter.InsertTextBefore(insertLoc, modifySrc);
+    }
+    NeedInsertSrcAndLocs.clear();
+    return true;
+}
+
 void ConditionalOperatorVisitor::RewriteCondOpRHS(Expr *expr, SourceLocation insertLoc){
     SourceRange srcRange = SourceRange(expr->getBeginLoc(), expr->getEndLoc());
     QualType t = expr->getType();
     std::string type = t.getAsString();
-
+    if(type == "_Bool")
+        type = "bool";
+    
     std::string exprSrc = TheRewriter.getRewrittenText(srcRange);
 
     ///Format: Type rhsxx = trueExpr

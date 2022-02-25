@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-18 09:44:00
- * @LastEditTime: 2022-02-24 16:17:22
+ * @LastEditTime: 2022-02-25 14:19:20
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/InsertLocationInfo.cpp
@@ -18,7 +18,8 @@ bool startWith(const string &str, const string &head) {
 
 void InsertInfoVisitor::Visit(Stmt *s){
     for(auto *subStmt: s->children()){
-        if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt))
+        BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt);
+        if(binOp && binOp->isAssignmentOp())
             Visit(subStmt, SourceRange(binOp->getBeginLoc(), binOp->getEndLoc()));
         else
             Visit(subStmt);
@@ -35,12 +36,15 @@ void InsertInfoVisitor::Visit(Stmt *s, SourceRange insertSourceRange){
         if(ConditionalOperator *condOp = dyn_cast<ConditionalOperator>(subStmt)){
             addInsertLocs(insertSourceRange);
             Visit(condOp, insertSourceRange);
+            continue;
         }
         else if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt)){
-            Visit(subStmt, SourceRange(binOp->getBeginLoc(), binOp->getEndLoc()));
+            if(binOp->isAssignmentOp()){
+                Visit(subStmt, SourceRange(binOp->getBeginLoc(), binOp->getEndLoc()));
+                continue;
+            }
         }
-        else
-            Visit(subStmt, insertSourceRange);
+        Visit(subStmt, insertSourceRange);
     }
 }
 
@@ -52,7 +56,8 @@ bool InsertInfoVisitor::VisitCXXMethodDecl(CXXMethodDecl *mdecl){
         return false;
 
     for(auto *subStmt :mdecl->getBody()->children()){
-        if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt))
+        BinaryOperator *binOp = dyn_cast<BinaryOperator>(subStmt);
+        if(binOp && binOp->isAssignmentOp())
             Visit(subStmt, SourceRange(binOp->getBeginLoc(), binOp->getEndLoc()));
         else
             Visit(subStmt);
