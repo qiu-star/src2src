@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-22 18:16:12
+ * @LastEditTime: 2022-02-26 18:16:28
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/IfStmtRewrite.h
@@ -38,15 +38,17 @@ private:
    bool isRewriten;
 public:
    IfStmtVisitor(Rewriter &R)
-      : TheRewriter(R),isRewriten(false){}
+      : TheRewriter(R), isRewriten(false){}
 
    bool VisitIfStmt(IfStmt *ifStmt);
    bool hasSingleAssignStmtWithoutElse(IfStmt *ifStmt);
+   bool hasSinglesymmetricalStmt(IfStmt *ifStmt);
    void RewriteIfStmt(Stmt *s, SourceLocation insertLoc);
    SourceLocation getInsertLocation(Stmt *s);
    //Overide func
    bool shouldTraversePostOrder() const { return true; }
    bool Rewrite();
+   std::string getSourceCodeFromStmt(Stmt *s);
 };
 
 class IfStmtConsumer : public ASTConsumer {
