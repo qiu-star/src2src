@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-28 11:24:02
+ * @LastEditTime: 2022-02-28 15:53:21
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/RecordAssignmentStmtLocs.h
@@ -38,9 +38,7 @@ private:
 public:
     AssignmentLocVisitor(){}
 
-    bool VisitCXXMethodDecl(CXXMethodDecl *mdecl);
-    void Visit(Stmt *s);
-    void Visit(Stmt *s, SourceRange insertSourceRange);
+    bool VisitBinaryOperator(BinaryOperator *binOp);
     void addAssignmentLocs(SourceRange insertSourceRange);
     std::vector<SourceRange> getAssignmentLocs();
 };
@@ -58,7 +56,6 @@ public:
       return true;
    }
 
-   //@TODO
    std::vector<SourceRange> getAssignmentLocs(){
       return mVisitor.getAssignmentLocs();
    }

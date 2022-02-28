@@ -8,3 +8,6 @@ cmake -DLLVM_DIR=/usr/local/llvm10ra/  -DCMAKE_BUILD_TYPE=Debug /home/src2src
 ./src2src ../kernel/kernel.cpp -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -c
 
 ./src2src ../kernel/VSimTop__1.cpp -rCondOP -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -c
+
+需要先CondOpTransform，得到文件夹1
+然后IfStmtTransform+CondOpTransform，这时会出现空的文件，将这些空的文件用文件夹1中的文件替换
