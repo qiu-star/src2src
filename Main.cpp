@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 19:14:02
- * @LastEditTime: 2022-02-26 18:16:54
+ * @LastEditTime: 2022-02-28 14:12:09
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/Main.cpp
@@ -32,7 +32,7 @@
 #include "HeaderSearchDirs.hh"
 #include "ConditionalOperatorRewrite.h"
 #include "IfStmtRewrite.h"
-#include "InsertLocationInfo.h"
+#include "RecordAssignmentStmtLocs.h"
 #include "Utilities.hh"
 
 /* Command line arguments.  These work better as globals, as suggested in llvm/CommandLine documentation */
@@ -139,7 +139,7 @@ void parse(clang::CompilerInstance & ci){
     ci.getDiagnosticClient().EndSourceFile();
 }
 
-std::vector<SourceRange> getStmt2InsertLoc(){
+std::vector<SourceRange> getAssignmentLocs(){
     clang::CompilerInstance ci ;
     init(ci);
 
@@ -148,17 +148,17 @@ std::vector<SourceRange> getStmt2InsertLoc(){
     Rewriter rewriter;
     SourceManager &SourceMgr = ci.getSourceManager();
     rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
-    InsertInfoConsumer* astConsumer = new InsertInfoConsumer();
+    AssignmentLocConsumer* astConsumer = new AssignmentLocConsumer();
     ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
 
     
     ci.createSema(clang::TU_Prefix, NULL);
 
     parse(ci);
-    return astConsumer->getInsertLocs();
+    return astConsumer->getAssignmentLocs();
 }
 
-void rewriteCondOp(std::vector<SourceRange> InsertLocs){
+void rewriteCondOp(std::vector<SourceRange> AssignmentLocs){
     clang::CompilerInstance ci ;
     init(ci);
 
@@ -167,7 +167,7 @@ void rewriteCondOp(std::vector<SourceRange> InsertLocs){
     Rewriter rewriter;
     SourceManager &SourceMgr = ci.getSourceManager();
     rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
-    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, InsertLocs);
+    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, AssignmentLocs);
     ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
 
     
@@ -176,11 +176,9 @@ void rewriteCondOp(std::vector<SourceRange> InsertLocs){
     parse(ci);
 
     //Rewrite the source code
-    if(astConsumer->IsRewriteSuccessful()){
-        const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
-        if(rb)
-            llvm::outs()<<string(rb->begin(), rb->end());
-    }
+    const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
+    if(rb)
+        llvm::outs()<<string(rb->begin(), rb->end());
 }
 
 void rewriteIf(){
@@ -201,11 +199,10 @@ void rewriteIf(){
     parse(ci);
 
     //Rewrite the source code
-    if(astConsumer->IsRewriteSuccessful()){
-        const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
-        if(rb)
-            llvm::outs()<<string(rb->begin(), rb->end());
-    }
+    const RewriteBuffer *rb = rewriter.getRewriteBufferFor(SourceMgr.getMainFileID());
+    if(rb)
+        llvm::outs()<<string(rb->begin(), rb->end());
+
 }
 
 int main(int argc, char * argv[]){
@@ -232,8 +229,8 @@ int main(int argc, char * argv[]){
     }
 
     if(rewriteConditionOp){
-        std::vector<SourceRange>  InsertLocs = getStmt2InsertLoc();
-        rewriteCondOp(InsertLocs);
+        std::vector<SourceRange>  AssignmentLocs = getAssignmentLocs();
+        rewriteCondOp(AssignmentLocs);
     }
 
     if(rewriteIfStmt){

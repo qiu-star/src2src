@@ -1,10 +1,10 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-18 12:51:59
+ * @LastEditTime: 2022-02-28 11:24:02
  * @LastEditors: qiulei
  * @Description: 
- * @FilePath: /src2src/InsertLocationInfo.h
+ * @FilePath: /src2src/RecordAssignmentStmtLocs.h
  */
 #include <cstdio>
 #include <memory>
@@ -32,24 +32,24 @@
 using namespace clang;
 using namespace std;
 
-class InsertInfoVisitor : public RecursiveASTVisitor<InsertInfoVisitor> {
+class AssignmentLocVisitor : public RecursiveASTVisitor<AssignmentLocVisitor> {
 private:
-    std::vector<SourceRange> InsertLocs;
+    std::vector<SourceRange> AssignmentLocs;
 public:
-    InsertInfoVisitor(){}
+    AssignmentLocVisitor(){}
 
     bool VisitCXXMethodDecl(CXXMethodDecl *mdecl);
     void Visit(Stmt *s);
     void Visit(Stmt *s, SourceRange insertSourceRange);
-    void addInsertLocs(SourceRange insertSourceRange);
-    std::vector<SourceRange> getInsertLocs();
+    void addAssignmentLocs(SourceRange insertSourceRange);
+    std::vector<SourceRange> getAssignmentLocs();
 };
 
-class InsertInfoConsumer : public ASTConsumer {
+class AssignmentLocConsumer : public ASTConsumer {
 private:
-   InsertInfoVisitor mVisitor;
+   AssignmentLocVisitor mVisitor;
 public:
-   InsertInfoConsumer() : mVisitor(){}
+   AssignmentLocConsumer() : mVisitor(){}
 
    virtual bool HandleTopLevelDecl(DeclGroupRef DR) {
       for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)
@@ -59,7 +59,7 @@ public:
    }
 
    //@TODO
-   std::vector<SourceRange> getInsertLocs(){
-      return mVisitor.getInsertLocs();
+   std::vector<SourceRange> getAssignmentLocs(){
+      return mVisitor.getAssignmentLocs();
    }
 };

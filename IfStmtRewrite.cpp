@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-22 15:22:42
- * @LastEditTime: 2022-02-26 18:17:30
+ * @LastEditTime: 2022-02-28 10:47:59
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/IfStmtRewrite.cpp
@@ -16,65 +16,85 @@ std::string IfStmtVisitor::getSourceCodeFromStmt(Stmt *s){
 
 bool IfStmtVisitor::VisitIfStmt(IfStmt *ifStmt){
     //Step1: deal with if-then-else
-    // if(!hasSinglesymmetricalStmt(ifStmt))
-    //     return true;
-    
-    // std::string ifSrc = getSourceCodeFromStmt(ifStmt);
-    // if(ifSrc == "")
-    //     return true;
-    
-    // SourceLocation insertLoc = getInsertLocation(ifStmt);
+    // RewriteIfWithSymmetricalStmt(ifStmt);
 
-    // std::string condSrc = getSourceCodeFromStmt(ifStmt->getCond());
+    //Step2: deal with if-then
+    RewriteIfWithoutElse(ifStmt);
 
-    // CompoundStmt *thenBody = dyn_cast<CompoundStmt>(ifStmt->getThen());
-    // CompoundStmt *elseBody = dyn_cast<CompoundStmt>(ifStmt->getElse());
-    // BinaryOperator *thenBinOp = dyn_cast<BinaryOperator>(thenBody->body_front());
-    // BinaryOperator *elseBinOp = dyn_cast<BinaryOperator>(elseBody->body_front());
+    return true;
+}
 
-    // std::string lhsSrc = getSourceCodeFromStmt(thenBinOp->getLHS());
-    // std::string thenRhsSrc = getSourceCodeFromStmt(thenBinOp->getRHS());
-    // std::string elseRhsSrc = getSourceCodeFromStmt(elseBinOp->getRHS());
-    // std::string modifySrc = lhsSrc+" = ("+condSrc+")? "+thenRhsSrc+": "+elseRhsSrc+";\n";
-    // //We should remove first, then insert to avoid error
-    // TheRewriter.RemoveText(SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc()));
-    // TheRewriter.InsertTextBefore(insertLoc, modifySrc);
-
-    // isRewriten = true;
-
+/**
+ * @description: 
+ * convert from:
+ * if(cond)
+ *  a = var1;
+ * to:
+ *  a = cond? var1: a;
+ * @param {IfStmt} *ifStmt
+ * @return {*}
+ */
+void IfStmtVisitor::RewriteIfWithoutElse(IfStmt *ifStmt){
     if(!hasSingleAssignStmtWithoutElse(ifStmt))
-        return true;
+        return;
     
-    SourceRange srcRange = SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc());
-    std::string ifSrc = TheRewriter.getRewrittenText(srcRange);
+    std::string ifSrc = getSourceCodeFromStmt(ifStmt);
     if(ifSrc == "")
-        return true;
+        return;
     
     SourceLocation insertLoc = getInsertLocation(ifStmt);
 
-    Stmt *cond = ifStmt->getCond();
-    SourceRange condRange = SourceRange(cond->getBeginLoc(), cond->getEndLoc());
-    std::string condSrc = TheRewriter.getRewrittenText(condRange);
+    std::string condSrc = getSourceCodeFromStmt(ifStmt->getCond());
 
     if(CompoundStmt *cs = dyn_cast<CompoundStmt>(ifStmt->getThen())){
         if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(cs->body_front())){
-            Stmt *lhs = binOp->getLHS();
-            SourceRange lhsRange = SourceRange(lhs->getBeginLoc(), lhs->getEndLoc());
-            std::string lhsSrc = TheRewriter.getRewrittenText(lhsRange);
-
-            Stmt *rhs = binOp->getRHS();
-            SourceRange rhsRange = SourceRange(rhs->getBeginLoc(), rhs->getEndLoc());
-            std::string rhsSrc = TheRewriter.getRewrittenText(rhsRange);
+            std::string lhsSrc = getSourceCodeFromStmt(binOp->getLHS());
+            std::string rhsSrc = getSourceCodeFromStmt(binOp->getRHS());
 
             std::string modifySrc = "{"+lhsSrc+" = "+condSrc+"? "+rhsSrc+": "+lhsSrc+";}\n";
             //We should remove first, then insert to avoid error
-            TheRewriter.RemoveText(srcRange);
+            TheRewriter.RemoveText(SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc()));
             TheRewriter.InsertTextBefore(insertLoc, modifySrc);
-
-            isRewriten = true;
         }
     }
-    return true;
+}
+
+/**
+ * @description:
+ * convert from:
+ * if(cond)
+ *  a = var1;
+ * else
+ *  a = var2;
+ * to:
+ * a = cond? var1: var2;
+ * @param {IfStmt} *ifStmt
+ * @return {*}
+ */
+void IfStmtVisitor::RewriteIfWithSymmetricalStmt(IfStmt *ifStmt){
+    if(!hasSingleSymmetricalStmt(ifStmt))
+        return;
+    
+    std::string ifSrc = getSourceCodeFromStmt(ifStmt);
+    if(ifSrc == "")
+        return;
+    
+    SourceLocation insertLoc = getInsertLocation(ifStmt);
+
+    std::string condSrc = getSourceCodeFromStmt(ifStmt->getCond());
+
+    CompoundStmt *thenBody = dyn_cast<CompoundStmt>(ifStmt->getThen());
+    CompoundStmt *elseBody = dyn_cast<CompoundStmt>(ifStmt->getElse());
+    BinaryOperator *thenBinOp = dyn_cast<BinaryOperator>(thenBody->body_front());
+    BinaryOperator *elseBinOp = dyn_cast<BinaryOperator>(elseBody->body_front());
+
+    std::string lhsSrc = getSourceCodeFromStmt(thenBinOp->getLHS());
+    std::string thenRhsSrc = getSourceCodeFromStmt(thenBinOp->getRHS());
+    std::string elseRhsSrc = getSourceCodeFromStmt(elseBinOp->getRHS());
+    std::string modifySrc = lhsSrc+" = ("+condSrc+")? "+thenRhsSrc+": "+elseRhsSrc+";\n";
+    //We should remove first, then insert to avoid error
+    TheRewriter.RemoveText(SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc()));
+    TheRewriter.InsertTextBefore(insertLoc, modifySrc);
 }
 
 bool IfStmtVisitor::hasSingleAssignStmtWithoutElse(IfStmt *ifStmt){
@@ -97,7 +117,7 @@ bool IfStmtVisitor::hasSingleAssignStmtWithoutElse(IfStmt *ifStmt){
  * @param {IfStmt} *ifStmt
  * @return {*}
  */
-bool IfStmtVisitor::hasSinglesymmetricalStmt(IfStmt *ifStmt){
+bool IfStmtVisitor::hasSingleSymmetricalStmt(IfStmt *ifStmt){
     if(!ifStmt->getElse())
         return false;
     CompoundStmt *thenBody = dyn_cast<CompoundStmt>(ifStmt->getThen());
@@ -133,8 +153,4 @@ bool IfStmtVisitor::hasSinglesymmetricalStmt(IfStmt *ifStmt){
 SourceLocation IfStmtVisitor::getInsertLocation(Stmt *s){
     //We can insert the text before the if stmt
     return s->getBeginLoc();
-}
-
-bool IfStmtVisitor::Rewrite(){
-    return isRewriten;
 }

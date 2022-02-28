@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-26 18:16:28
+ * @LastEditTime: 2022-02-28 10:39:26
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/IfStmtRewrite.h
@@ -35,26 +35,24 @@ using namespace std;
 class IfStmtVisitor : public RecursiveASTVisitor<IfStmtVisitor> {
 private:
    Rewriter &TheRewriter;
-   bool isRewriten;
 public:
    IfStmtVisitor(Rewriter &R)
-      : TheRewriter(R), isRewriten(false){}
+      : TheRewriter(R){}
 
    bool VisitIfStmt(IfStmt *ifStmt);
    bool hasSingleAssignStmtWithoutElse(IfStmt *ifStmt);
-   bool hasSinglesymmetricalStmt(IfStmt *ifStmt);
-   void RewriteIfStmt(Stmt *s, SourceLocation insertLoc);
+   bool hasSingleSymmetricalStmt(IfStmt *ifStmt);
+   void RewriteIfWithoutElse(IfStmt *ifStmt);
+   void RewriteIfWithSymmetricalStmt(IfStmt *ifStmt);
    SourceLocation getInsertLocation(Stmt *s);
    //Overide func
    bool shouldTraversePostOrder() const { return true; }
-   bool Rewrite();
    std::string getSourceCodeFromStmt(Stmt *s);
 };
 
 class IfStmtConsumer : public ASTConsumer {
 private:
    IfStmtVisitor mVisitor;
-   bool RewriteSuccessful;
 public:
    IfStmtConsumer(Rewriter &R) : mVisitor(R){}
 
@@ -62,9 +60,6 @@ public:
       for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)
          // Traverse the declaration using our AST visitor.
          mVisitor.TraverseDecl(*b);
-      RewriteSuccessful = mVisitor.Rewrite();
       return true;
    }
-
-   bool IsRewriteSuccessful(){return RewriteSuccessful;}
 };

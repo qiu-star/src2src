@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 11:26:25
- * @LastEditTime: 2022-02-25 16:00:42
+ * @LastEditTime: 2022-02-28 11:13:12
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.cpp
@@ -18,68 +18,42 @@ bool ConditionalOperatorVisitor::VisitConditionalOperator(ConditionalOperator *c
         return true;
     
     //Can't find where to insert
-    SourceLocation insertLoc = getInsertLocation(condOp);
-    if(insertLoc == condOp->getBeginLoc())
+    if(!isInAssignmentStmt(condOp))
         return true;
     
     ////////Replace the true Expr////////
-    RewriteCondOpRHS(condOp->getTrueExpr(), insertLoc);
+    RewriteCondOpRHS(condOp->getTrueExpr());
     
     ////////Replace the false Expr////////
-    RewriteCondOpRHS(condOp->getFalseExpr(), insertLoc);
+    RewriteCondOpRHS(condOp->getFalseExpr());
 
     // ////////Replace the condOP////////
     // RewriteCondOp(condOp, insertLoc);
     return true;
 }
 
-// bool ConditionalOperatorVisitor::VisitCXXMemberCallExpr(CXXMemberCallExpr *callExpr){
-//     if(NeedInsertSrcAndLocs.empty())
-//         return true;
-    
-//     for(int i=NeedInsertSrcAndLocs.size()-1; i>=0; i--){
-//         auto &p = NeedInsertSrcAndLocs[i];
-//         std::string modifySrc = p.first;
-//         SourceLocation insertLoc = callExpr->getBeginLoc();
-//         TheRewriter.InsertTextBefore(insertLoc, modifySrc);
-//     }
-//     NeedInsertSrcAndLocs.clear();
-//     return true;
-// }
-
-// bool ConditionalOperatorVisitor::VisitCallExpr(CallExpr *callExpr){
-//     if(NeedInsertSrcAndLocs.empty())
-//         return true;
-    
-//     for(int i=NeedInsertSrcAndLocs.size()-1; i>=0; i--){
-//         auto &p = NeedInsertSrcAndLocs[i];
-//         std::string modifySrc = p.first;
-//         SourceLocation insertLoc = callExpr->getBeginLoc();
-//         TheRewriter.InsertTextBefore(insertLoc, modifySrc);
-//     }
-//     NeedInsertSrcAndLocs.clear();
-//     return true;
-// }
-
-
+/**
+ * @description: Because we visit the ast tree in post order, so when we visit the assignment stmt, we insert the text before it.
+ * @param {BinaryOperator} *binOp
+ * @return {*}
+ */
 bool ConditionalOperatorVisitor::VisitBinaryOperator(BinaryOperator *binOp){
     if(!binOp->isAssignmentOp())
         return true;
     
-    if(NeedInsertSrcAndLocs.empty())
+    if(NeedInsertSrcs.empty())
         return true;
     
-    for(int i=NeedInsertSrcAndLocs.size()-1; i>=0; i--){
-        auto &p = NeedInsertSrcAndLocs[i];
-        std::string modifySrc = p.first;
+    for(int i=NeedInsertSrcs.size()-1; i>=0; i--){
+        std::string modifySrc = NeedInsertSrcs[i];
         SourceLocation insertLoc = binOp->getBeginLoc();
         TheRewriter.InsertTextBefore(insertLoc, modifySrc);
     }
-    NeedInsertSrcAndLocs.clear();
+    NeedInsertSrcs.clear();
     return true;
 }
 
-void ConditionalOperatorVisitor::RewriteCondOpRHS(Expr *expr, SourceLocation insertLoc){
+void ConditionalOperatorVisitor::RewriteCondOpRHS(Expr *expr){
     SourceRange srcRange = SourceRange(expr->getBeginLoc(), expr->getEndLoc());
     QualType t = expr->getType();
     std::string type = t.getAsString();
@@ -90,12 +64,12 @@ void ConditionalOperatorVisitor::RewriteCondOpRHS(Expr *expr, SourceLocation ins
 
     ///Format: Type rhsxx = trueExpr
     std::string modifySrc = type+" "+prefixRHSName+to_string(tempRHSCounter)+" = "+exprSrc+";\n";
-    NeedInsertSrcAndLocs.push_back(make_pair(modifySrc, insertLoc));
+    NeedInsertSrcs.push_back(modifySrc);
     TheRewriter.ReplaceText(srcRange, prefixRHSName+to_string(tempRHSCounter));
     tempRHSCounter++;
 }
 
-void ConditionalOperatorVisitor::RewriteCondOp(ConditionalOperator *condOp, SourceLocation insertLoc){
+void ConditionalOperatorVisitor::RewriteCondOp(ConditionalOperator *condOp){
     //@TODO: After replace the text in getRewrittenText, TheRewriter.getRewrittenText(srcRange) go wrong
     // to fix this issue, we use the offset.
     SourceRange srcRange = SourceRange(condOp->getBeginLoc(), condOp->getEndLoc());
@@ -107,58 +81,24 @@ void ConditionalOperatorVisitor::RewriteCondOp(ConditionalOperator *condOp, Sour
 
     ///Format: Type tmpxx = condOp
     std::string modifySrc = type+" "+prefixTempName+to_string(tempVarCounter)+" = "+condOpSrc+";\n";
-    NeedInsertSrcAndLocs.push_back(make_pair(modifySrc, insertLoc));
+    NeedInsertSrcs.push_back(modifySrc);
     TheRewriter.ReplaceText(srcRange, prefixTempName+to_string(tempVarCounter));
     tempVarCounter++;
 }
 
-/**
- * @description: Because we visit the ast tree in post order, so we should insert the modify source from back to front
- */
-bool ConditionalOperatorVisitor::Rewrite(){
-    if(NeedInsertSrcAndLocs.size() == 0)
-        return false;
-    for(int i=NeedInsertSrcAndLocs.size()-1; i>=0; i--){
-        auto &p = NeedInsertSrcAndLocs[i];
-        std::string modifySrc = p.first;
-        SourceLocation insertLoc = p.second;
-        TheRewriter.InsertTextBefore(insertLoc, modifySrc);
-    }
-    return ((NeedInsertSrcAndLocs.size()-1) >= 0);
-}
 
 /**
- * @description: Get the insert location of s
+ * @description: check whether s is in a assignment stmt.
  * @param {Stmt} *s
- * @return {SourceLocation} the insert location of s
+ * @return {bool}
  */
-SourceLocation ConditionalOperatorVisitor::getInsertLocation(Stmt *s){
+bool ConditionalOperatorVisitor::isInAssignmentStmt(Stmt *s){
     //s->getBeginLoc is in the sourceRange of Compound
-    for(int i=InsertLocs.size()-1; i>=0; i--){
+    for(int i=AssignmentStmtLocs.size()-1; i>=0; i--){
         //@TODO: in range
-        if(InsertLocs[i].fullyContains(SourceRange(s->getBeginLoc(), s->getEndLoc()))){
-            //InsertLocs[i].getBegin() is the staert of CompoundStmt, so we should insert
-            //the tmp after it.
-            return InsertLocs[i].getBegin();
+        if(AssignmentStmtLocs[i].fullyContains(SourceRange(s->getBeginLoc(), s->getEndLoc()))){
+            return true;
         }
     }
-    return s->getBeginLoc();
-
-    // const Stmt* ST = s;
-    // while (true) {
-    //     //get parents
-    //     const auto& parents = TheContext.getParents(*ST);
-    //     if ( parents.empty() ){
-    //         llvm::errs() << "Can not find parent\n";
-    //         return s->getBeginLoc();
-    //     }
-    
-    //     llvm::errs() << "find parent size=" << parents.size() << "\n";
-    //     ST = parents[0].get<Stmt>();
-    //     if (!ST)
-    //         return s->getBeginLoc();
-    //     if (isa<CompoundStmt>(ST))
-    //         break;
-    // }
-    // return ST->getBeginLoc();
+    return false;
 }

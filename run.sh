@@ -1,7 +1,7 @@
 ###
  # @Author: qiulei
  # @Date: 2022-02-21 11:26:35
- # @LastEditTime: 2022-02-26 20:04:08
+ # @LastEditTime: 2022-02-28 11:30:44
  # @LastEditors: qiulei
  # @Description: 
  # @FilePath: /src2src/run.sh
@@ -27,6 +27,6 @@ IfStmtTransform(){
 }
 
 echo "---------------Transform Begin---------------"
-IfStmtTransform
+# IfStmtTransform
 CondOpTransform
 echo "---------------Transform End---------------"

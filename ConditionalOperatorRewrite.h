@@ -1,7 +1,7 @@
 /*
  * @Author: qiulei
  * @Date: 2022-02-16 10:07:03
- * @LastEditTime: 2022-02-25 16:01:13
+ * @LastEditTime: 2022-02-28 11:11:14
  * @LastEditors: qiulei
  * @Description: 
  * @FilePath: /src2src/ConditionalOperatorRewrite.h
@@ -35,9 +35,9 @@ using namespace std;
 class ConditionalOperatorVisitor : public RecursiveASTVisitor<ConditionalOperatorVisitor> {
 private:
    Rewriter &TheRewriter;
-   std::vector<SourceRange>  &InsertLocs;
+   std::vector<SourceRange>  &AssignmentStmtLocs;
 
-   std::vector<std::pair<std::string, SourceLocation>> NeedInsertSrcAndLocs;
+   std::vector<std::string> NeedInsertSrcs;
 
    //Store the rhs of condOP
    long long int tempRHSCounter = 0;
@@ -49,24 +49,20 @@ private:
    
 public:
    ConditionalOperatorVisitor(Rewriter &R, std::vector<SourceRange> &V)
-      : TheRewriter(R), InsertLocs(V){}
+      : TheRewriter(R), AssignmentStmtLocs(V){}
 
    bool VisitConditionalOperator(ConditionalOperator *condOp);
    bool VisitBinaryOperator(BinaryOperator *binOp);
-   // bool VisitCXXMemberCallExpr(CXXMemberCallExpr *callExpr);
-   // bool VisitCallExpr(CallExpr *callExpr);
-   void RewriteCondOpRHS(Expr *expr, SourceLocation insertLoc);
-   void RewriteCondOp(ConditionalOperator *condOp, SourceLocation insertLoc);
-   SourceLocation getInsertLocation(Stmt *s);
+   void RewriteCondOpRHS(Expr *expr);
+   void RewriteCondOp(ConditionalOperator *condOp);
+   bool isInAssignmentStmt(Stmt *s);
    //Overide func
    bool shouldTraversePostOrder() const { return true; }
-   bool Rewrite();
 };
 
 class ConditionalOperatorConsumer : public ASTConsumer {
 private:
    ConditionalOperatorVisitor mVisitor;
-   bool RewriteSuccessful;
 public:
    ConditionalOperatorConsumer(Rewriter &R, std::vector<SourceRange> &V) : mVisitor(R, V){}
 
@@ -74,9 +70,6 @@ public:
       for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)
          // Traverse the declaration using our AST visitor.
          mVisitor.TraverseDecl(*b);
-      // RewriteSuccessful = mVisitor.Rewrite();
       return true;
    }
-
-   bool IsRewriteSuccessful(){return true;}
 };
