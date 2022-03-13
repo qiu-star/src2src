@@ -111,6 +111,7 @@ void init(clang::CompilerInstance & ci){
     // Add all of the include directories to the preprocessor
     HeaderSearchDirs hsd(ci.getPreprocessor().getHeaderSearchInfo(), ci.getHeaderSearchOpts(), pp, sim_services_flag);
     hsd.addSearchDirs(include_dirs, isystem_dirs);
+    hsd.addDefines(defines);
     
     pp.getBuiltinInfo().initializeBuiltins(pp.getIdentifierTable(), pp.getLangOpts());
 }
@@ -139,7 +140,7 @@ void parse(clang::CompilerInstance & ci){
     ci.getDiagnosticClient().EndSourceFile();
 }
 
-std::vector<SourceRange> getAssignmentLocs(){
+void getLocs(std::vector<SourceRange> &outAssignLocs,  std::vector<SourceRange> &outCompoundLocs){
     clang::CompilerInstance ci ;
     init(ci);
 
@@ -155,10 +156,14 @@ std::vector<SourceRange> getAssignmentLocs(){
     ci.createSema(clang::TU_Prefix, NULL);
 
     parse(ci);
-    return astConsumer->getAssignmentLocs();
+    std::vector<SourceRange> av = astConsumer->getAssignmentLocs();
+    outAssignLocs.assign(av.begin(), av.end());
+
+    std::vector<SourceRange> cv = astConsumer->getCompoundStmtLocs();
+    outCompoundLocs.assign(cv.begin(), cv.end());
 }
 
-void rewriteCondOp(std::vector<SourceRange> AssignmentLocs){
+void rewriteCondOp(std::vector<SourceRange> AssignmentLocs, std::vector<SourceRange> CompoundStmtLocs){
     clang::CompilerInstance ci ;
     init(ci);
 
@@ -167,7 +172,7 @@ void rewriteCondOp(std::vector<SourceRange> AssignmentLocs){
     Rewriter rewriter;
     SourceManager &SourceMgr = ci.getSourceManager();
     rewriter.setSourceMgr(SourceMgr, ci.getLangOpts());
-    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, AssignmentLocs);
+    ConditionalOperatorConsumer* astConsumer = new ConditionalOperatorConsumer(rewriter, AssignmentLocs, CompoundStmtLocs);
     ci.setASTConsumer(std::move(std::unique_ptr<clang::ASTConsumer>(astConsumer)));
 
     
@@ -228,14 +233,16 @@ int main(int argc, char * argv[]){
         return 1;
     }
 
-    if(rewriteConditionOp){
-        std::vector<SourceRange>  AssignmentLocs = getAssignmentLocs();
-        rewriteCondOp(AssignmentLocs);
-    }
+    // if(rewriteConditionOp){
+        // std::vector<SourceRange> AssignmentLocs;
+        // std::vector<SourceRange> CompoundStmtLocs;
+        // getLocs(AssignmentLocs, CompoundStmtLocs);
+        // rewriteCondOp(AssignmentLocs, CompoundStmtLocs);
+    // }
 
-    if(rewriteIfStmt){
+    // if(rewriteIfStmt){
         rewriteIf();
-    }
+    // }
     
     return 0;
 }

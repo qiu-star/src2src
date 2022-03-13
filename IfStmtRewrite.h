@@ -40,10 +40,10 @@ public:
       : TheRewriter(R){}
 
    bool VisitIfStmt(IfStmt *ifStmt);
-   bool hasSingleAssignStmtWithoutElse(IfStmt *ifStmt);
-   bool hasSingleSymmetricalStmt(IfStmt *ifStmt);
-   void RewriteIfWithoutElse(IfStmt *ifStmt);
-   void RewriteIfWithSymmetricalStmt(IfStmt *ifStmt);
+   bool hasOnlyAssignStmtWithoutElse(IfStmt *ifStmt, int maxStmtNum=1);
+   bool hasSymmetricalStmt(IfStmt *ifStmt, int maxStmtNum=1);
+   void RewriteIfWithoutElse(IfStmt *ifStmt, int maxStmtNum=1);
+   void RewriteIfWithSymmetricalStmt(IfStmt *ifStmt, int maxStmtNum=1);
    SourceLocation getInsertLocation(Stmt *s);
    //Overide func
    bool shouldTraversePostOrder() const { return true; }

@@ -35,12 +35,15 @@ using namespace std;
 class AssignmentLocVisitor : public RecursiveASTVisitor<AssignmentLocVisitor> {
 private:
     std::vector<SourceRange> AssignmentLocs;
+    std::vector<SourceRange> CompoundStmtLocs;
 public:
     AssignmentLocVisitor(){}
 
     bool VisitBinaryOperator(BinaryOperator *binOp);
-    void addAssignmentLocs(SourceRange insertSourceRange);
+    bool VisitCompoundStmt(CompoundStmt *cs);
+    void addV(std::vector<SourceRange> &v, SourceRange insertSourceRange);
     std::vector<SourceRange> getAssignmentLocs();
+    std::vector<SourceRange> getCompoundStmtLocs();
 };
 
 class AssignmentLocConsumer : public ASTConsumer {
@@ -58,5 +61,9 @@ public:
 
    std::vector<SourceRange> getAssignmentLocs(){
       return mVisitor.getAssignmentLocs();
+   }
+
+   std::vector<SourceRange> getCompoundStmtLocs(){
+      return mVisitor.getCompoundStmtLocs();
    }
 };

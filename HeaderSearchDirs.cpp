@@ -385,13 +385,13 @@ void HeaderSearchDirs::addDefines ( std::vector<std::string> & defines ) {
     std::string predefines("#define TRICK_ICG\n");
     predefines += "#define __STRICT_ANSI__\n";
     for ( ii = 0 ; ii < defines.size() ; ii++ ) {
-        size_t found = defines[ii].find("=") ;
-        if ( found != defines[ii].npos ) {
-            defines[ii].replace( found , 1 , " " ) ;
-        } else {
-            defines[ii] += " 1" ;
-        }
-        predefines += std::string("#define ") + defines[ii] + "\n" ;
+        // size_t found = defines[ii].find("=") ;
+        // if ( found != defines[ii].npos ) {
+        //     defines[ii].replace( found , 1 , " " ) ;
+        // } else {
+        //     defines[ii] += " 1" ;
+        // }
+        predefines += std::string("#define ") + defines[ii] + " 1\n" ;
     }
     pp.setPredefines(pp.getPredefines() + "\n" + predefines) ;
 }

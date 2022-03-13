@@ -9,20 +9,26 @@
 
 CondOpTransform(){
     echo "---------------CondOp Transform---------------"
-    for i in `seq 86`
+    cd ../emu-compile-large
+    # cd ../emu-compile
+    # cd IfStmtOut
+    for i in `ls *.cpp`
     do
-        echo "Transform VSimTop__"$i".cpp"
-        build/src2src "../emu-compile/VSimTop__"$i".cpp" -rCondOP -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -c &> "condOpOut/VSimTop__"$i".modify.cpp"
+        echo "Transform "$i
+        # ../src2src/build/src2src $i -rCondOP -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -c &> "../src2src/condOpOut/"$i
         # build/src2src "IfStmtOut/VSimTop__"$i".modify.cpp" -rCondOP -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -c &> "condOpOut/VSimTop__"$i".modify.cpp"
+        /home/src2src/build/src2src $i -rCondOp -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -I/usr/include/SDL2 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -DWITH_DRAMSIM3 -DVL_THREADED -std=gnu++14  -c &> "/home/src2src/condOpOut/"$i
     done
 }
 
 IfStmtTransform(){
     echo "---------------IfStmt Transform---------------"
-    for i in `seq 86`
+    cd ../emu-compile-large
+    # cd ../emu-compile
+    for i in `ls *.cpp`
     do
-        echo "Transform VSimTop__"$i".cpp"
-        build/src2src "../emu-compile/VSimTop__"$i".cpp" -rIf -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -c &> "IfStmtOut/VSimTop__"$i".modify.cpp"
+        echo "Transform "$i
+        /home/src2src/build/src2src $i -rIf -I/usr/local/share/verilator/include -I/usr/local/share/verilator/include/vltstd -I/usr/include/SDL2 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward  -isystem /usr/local/include -isystem /usr/local/llvm10ra/lib/clang/10.0.0/include -isystem /usr/include -isystem /usr/include/x86_64-linux-gnu -DWITH_DRAMSIM3 -DVL_THREADED -std=gnu++14  -c &> "/home/src2src/IfStmtOut/"$i
     done
 }
 

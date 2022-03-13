@@ -8,6 +8,8 @@
  */
 #include "IfStmtRewrite.h"
 
+#define MAX_STMT_NUM 4
+
 std::string IfStmtVisitor::getSourceCodeFromStmt(Stmt *s){
     SourceRange srcRange = SourceRange(s->getBeginLoc(), s->getEndLoc());
     std::string src = TheRewriter.getRewrittenText(srcRange);
@@ -16,10 +18,10 @@ std::string IfStmtVisitor::getSourceCodeFromStmt(Stmt *s){
 
 bool IfStmtVisitor::VisitIfStmt(IfStmt *ifStmt){
     //Step1: deal with if-then-else
-    // RewriteIfWithSymmetricalStmt(ifStmt);
+    RewriteIfWithSymmetricalStmt(ifStmt, MAX_STMT_NUM);
 
     //Step2: deal with if-then
-    RewriteIfWithoutElse(ifStmt);
+    RewriteIfWithoutElse(ifStmt, MAX_STMT_NUM);
 
     return true;
 }
@@ -34,8 +36,8 @@ bool IfStmtVisitor::VisitIfStmt(IfStmt *ifStmt){
  * @param {IfStmt} *ifStmt
  * @return {*}
  */
-void IfStmtVisitor::RewriteIfWithoutElse(IfStmt *ifStmt){
-    if(!hasSingleAssignStmtWithoutElse(ifStmt))
+void IfStmtVisitor::RewriteIfWithoutElse(IfStmt *ifStmt, int maxStmtNum){
+    if(!hasOnlyAssignStmtWithoutElse(ifStmt, maxStmtNum))
         return;
     
     std::string ifSrc = getSourceCodeFromStmt(ifStmt);
@@ -43,20 +45,24 @@ void IfStmtVisitor::RewriteIfWithoutElse(IfStmt *ifStmt){
         return;
     
     SourceLocation insertLoc = getInsertLocation(ifStmt);
-
     std::string condSrc = getSourceCodeFromStmt(ifStmt->getCond());
+    if(condSrc == "") return;
 
-    if(CompoundStmt *cs = dyn_cast<CompoundStmt>(ifStmt->getThen())){
-        if(BinaryOperator *binOp = dyn_cast<BinaryOperator>(cs->body_front())){
-            std::string lhsSrc = getSourceCodeFromStmt(binOp->getLHS());
-            std::string rhsSrc = getSourceCodeFromStmt(binOp->getRHS());
+    CompoundStmt *cs = dyn_cast<CompoundStmt>(ifStmt->getThen());
 
-            std::string modifySrc = "{"+lhsSrc+" = "+condSrc+"? "+rhsSrc+": "+lhsSrc+";}\n";
-            //We should remove first, then insert to avoid error
-            TheRewriter.RemoveText(SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc()));
-            TheRewriter.InsertTextBefore(insertLoc, modifySrc);
-        }
+    std::string modifySrc = "{";
+    for(auto Itr = cs->body_begin(), Ie = cs->body_end(); Itr != Ie; Itr++){
+        BinaryOperator *binOp = dyn_cast<BinaryOperator>(*Itr);
+        std::string lhsSrc = getSourceCodeFromStmt(binOp->getLHS());
+        std::string rhsSrc = getSourceCodeFromStmt(binOp->getRHS());
+        if(lhsSrc == "" || rhsSrc == "") return;
+        modifySrc += lhsSrc+" = "+condSrc+"? "+rhsSrc+": "+lhsSrc+";\n";
     }
+    modifySrc += "}";
+
+    //We should remove first, then insert to avoid error
+    TheRewriter.RemoveText(SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc()));
+    TheRewriter.InsertTextBefore(insertLoc, modifySrc);
 }
 
 /**
@@ -69,10 +75,12 @@ void IfStmtVisitor::RewriteIfWithoutElse(IfStmt *ifStmt){
  * to:
  * a = cond? var1: var2;
  * @param {IfStmt} *ifStmt
+ * @param {int} maxStmtNum when the stmt num of ifStmt overcome the maxStmtNum, we don't deal with it.
  * @return {*}
  */
-void IfStmtVisitor::RewriteIfWithSymmetricalStmt(IfStmt *ifStmt){
-    if(!hasSingleSymmetricalStmt(ifStmt))
+void IfStmtVisitor::RewriteIfWithSymmetricalStmt(IfStmt *ifStmt, int maxStmtNum){
+
+    if(!hasSymmetricalStmt(ifStmt, maxStmtNum))
         return;
     
     std::string ifSrc = getSourceCodeFromStmt(ifStmt);
@@ -82,33 +90,48 @@ void IfStmtVisitor::RewriteIfWithSymmetricalStmt(IfStmt *ifStmt){
     SourceLocation insertLoc = getInsertLocation(ifStmt);
 
     std::string condSrc = getSourceCodeFromStmt(ifStmt->getCond());
+    if(condSrc == "") return;
 
     CompoundStmt *thenBody = dyn_cast<CompoundStmt>(ifStmt->getThen());
     CompoundStmt *elseBody = dyn_cast<CompoundStmt>(ifStmt->getElse());
-    BinaryOperator *thenBinOp = dyn_cast<BinaryOperator>(thenBody->body_front());
-    BinaryOperator *elseBinOp = dyn_cast<BinaryOperator>(elseBody->body_front());
 
-    std::string lhsSrc = getSourceCodeFromStmt(thenBinOp->getLHS());
-    std::string thenRhsSrc = getSourceCodeFromStmt(thenBinOp->getRHS());
-    std::string elseRhsSrc = getSourceCodeFromStmt(elseBinOp->getRHS());
-    std::string modifySrc = lhsSrc+" = ("+condSrc+")? "+thenRhsSrc+": "+elseRhsSrc+";\n";
+    std::string modifySrc = "";
+    auto thenItr = thenBody->body_begin(), thenIe = thenBody->body_end();
+    auto elseItr = elseBody->body_begin(), elseIe = elseBody->body_end();
+    while((thenItr != thenIe) && (elseItr != elseIe)){
+        BinaryOperator *thenBinOp = dyn_cast<BinaryOperator>(*thenItr);
+        BinaryOperator *elseBinOp = dyn_cast<BinaryOperator>(*elseItr);
+
+        std::string lhsSrc = getSourceCodeFromStmt(thenBinOp->getLHS());
+        std::string thenRhsSrc = getSourceCodeFromStmt(thenBinOp->getRHS());
+        std::string elseRhsSrc = getSourceCodeFromStmt(elseBinOp->getRHS());
+        if(lhsSrc == "" || thenRhsSrc == "" || elseRhsSrc == "") return;
+        
+        modifySrc += lhsSrc+" = ("+condSrc+")? "+thenRhsSrc+": "+elseRhsSrc+";\n";
+
+        thenItr++;
+        elseItr++;
+    }
+    // modifySrc += "}\n";
+
     //We should remove first, then insert to avoid error
     TheRewriter.RemoveText(SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc()));
     TheRewriter.InsertTextBefore(insertLoc, modifySrc);
 }
 
-bool IfStmtVisitor::hasSingleAssignStmtWithoutElse(IfStmt *ifStmt){
+bool IfStmtVisitor::hasOnlyAssignStmtWithoutElse(IfStmt *ifStmt, int maxStmtNum){
     if(ifStmt->getElse())
         return false;
     
     CompoundStmt *cs = dyn_cast<CompoundStmt>(ifStmt->getThen());
-    if(!cs || cs->size() != 1)
+    if(!cs || cs->size() > maxStmtNum)
         return false;
     
-    BinaryOperator *binOp = dyn_cast<BinaryOperator>(cs->body_front());
-    if(!binOp || !binOp->isAssignmentOp())
-        return false;
-    
+    for(auto Itr = cs->body_begin(), Ie = cs->body_end(); Itr != Ie; Itr++){
+        BinaryOperator *binOp = dyn_cast<BinaryOperator>(*Itr);
+        if(!binOp || !binOp->isAssignmentOp())
+            return false;
+    }
     return true;
 }
 
@@ -117,32 +140,39 @@ bool IfStmtVisitor::hasSingleAssignStmtWithoutElse(IfStmt *ifStmt){
  * @param {IfStmt} *ifStmt
  * @return {*}
  */
-bool IfStmtVisitor::hasSingleSymmetricalStmt(IfStmt *ifStmt){
+bool IfStmtVisitor::hasSymmetricalStmt(IfStmt *ifStmt, int maxStmtNum){
     if(!ifStmt->getElse())
         return false;
     CompoundStmt *thenBody = dyn_cast<CompoundStmt>(ifStmt->getThen());
     CompoundStmt *elseBody = dyn_cast<CompoundStmt>(ifStmt->getElse());
-    if(!thenBody || thenBody->size() != 1
-        || !elseBody || elseBody->size() != 1)
+    if(!thenBody || thenBody->size() > maxStmtNum
+        || !elseBody || elseBody->size() > maxStmtNum
+        || thenBody->size() != elseBody->size())
         return false;
     
-    BinaryOperator *thenBinOp = dyn_cast<BinaryOperator>(thenBody->body_front());
-    BinaryOperator *elseBinOp = dyn_cast<BinaryOperator>(elseBody->body_front());
-    if(!thenBinOp || !thenBinOp->isAssignmentOp()
-        || !elseBinOp || !elseBinOp->isAssignmentOp())
-        return false;
-    
-    //@TODO: In this case, we only deal with lhs's type is MemberExpr, 
-    //other type we will thik about the next step.
-    MemberExpr *thenMexpr = dyn_cast<MemberExpr>(thenBinOp->getLHS());
-    MemberExpr *elseMexpr = dyn_cast<MemberExpr>(elseBinOp->getLHS());
-    if(!thenMexpr || !elseMexpr)
-        return false;
-    if(thenMexpr->getMemberDecl() == elseMexpr->getMemberDecl())
-        return true;
+    //All the stmt is assignStmt
+    //@TODO: We consider the lhs is in order
+    auto thenItr = thenBody->body_begin(), thenIe = thenBody->body_end();
+    auto elseItr = elseBody->body_begin(), elseIe = elseBody->body_end();
+    while((thenItr != thenIe) && (elseItr != elseIe)){
+        BinaryOperator *thenBinOp = dyn_cast<BinaryOperator>(*thenItr);
+        BinaryOperator *elseBinOp = dyn_cast<BinaryOperator>(*elseItr);
+        if(!thenBinOp || !thenBinOp->isAssignmentOp()
+            || !elseBinOp || !elseBinOp->isAssignmentOp())
+            return false;
+        //@TODO: In this case, we only deal with lhs's type is MemberExpr, 
+        //other type we will thik about the next step.
+        MemberExpr *thenMexpr = dyn_cast<MemberExpr>(thenBinOp->getLHS());
+        MemberExpr *elseMexpr = dyn_cast<MemberExpr>(elseBinOp->getLHS());
+        if(!thenMexpr || !elseMexpr)
+            return false;
+        if(thenMexpr->getMemberDecl() != elseMexpr->getMemberDecl())
+            return false;
+        thenItr++;
+        elseItr++;
+    }
 
-    return false;
-    
+    return true;
 }
 
 /**

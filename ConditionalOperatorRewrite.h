@@ -35,9 +35,11 @@ using namespace std;
 class ConditionalOperatorVisitor : public RecursiveASTVisitor<ConditionalOperatorVisitor> {
 private:
    Rewriter &TheRewriter;
-   std::vector<SourceRange>  &AssignmentStmtLocs;
+   std::vector<SourceRange> &AssignmentStmtLocs;
+   std::vector<SourceRange> &CompoundStmtLocs;
 
    std::vector<std::string> NeedInsertSrcs;
+   std::vector<pair<std::string, SourceLocation>> SrcsAndLocs;
 
    //Store the rhs of condOP
    long long int tempRHSCounter = 0;
@@ -48,28 +50,32 @@ private:
    std::string prefixTempName = "tmp";
    
 public:
-   ConditionalOperatorVisitor(Rewriter &R, std::vector<SourceRange> &V)
-      : TheRewriter(R), AssignmentStmtLocs(V){}
+   ConditionalOperatorVisitor(Rewriter &R, std::vector<SourceRange> &AV, std::vector<SourceRange> &CV)
+      : TheRewriter(R), AssignmentStmtLocs(AV), CompoundStmtLocs(CV){}
 
    bool VisitConditionalOperator(ConditionalOperator *condOp);
    bool VisitBinaryOperator(BinaryOperator *binOp);
-   void RewriteCondOpRHS(Expr *expr);
+   std::string RewriteCondOpRHS(Expr *expr);
    void RewriteCondOp(ConditionalOperator *condOp);
    bool isInAssignmentStmt(Stmt *s);
+   SourceLocation getInsertLoc(Stmt *s);
+   SourceRange getDeclRange(Expr *e);
    //Overide func
    bool shouldTraversePostOrder() const { return true; }
+   void Rewrite();
 };
 
 class ConditionalOperatorConsumer : public ASTConsumer {
 private:
    ConditionalOperatorVisitor mVisitor;
 public:
-   ConditionalOperatorConsumer(Rewriter &R, std::vector<SourceRange> &V) : mVisitor(R, V){}
+   ConditionalOperatorConsumer(Rewriter &R, std::vector<SourceRange> &AV, std::vector<SourceRange> &CV) : mVisitor(R, AV, CV){}
 
    virtual bool HandleTopLevelDecl(DeclGroupRef DR) {
       for (DeclGroupRef::iterator b = DR.begin(), e = DR.end(); b != e; ++b)
          // Traverse the declaration using our AST visitor.
          mVisitor.TraverseDecl(*b);
+      mVisitor.Rewrite();
       return true;
    }
 };
