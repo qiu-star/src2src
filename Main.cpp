@@ -98,6 +98,7 @@ void init(clang::CompilerInstance & ci){
     clang::TargetInfo *pti = clang::TargetInfo::CreateTargetInfo(ci.getDiagnostics(), shared_to);
     ci.setTarget(pti);
     ci.createPreprocessor(clang::TU_Complete);
+    // ci.createPreprocessor(clang::TranslationUnitKind::TU_Module);
 
     llvm::Triple trip (to.Triple) ;
     clang::CompilerInvocation::setLangDefaults(ci.getLangOpts(), clang::Language::CXX, trip, ppo) ;

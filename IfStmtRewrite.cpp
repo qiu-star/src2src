@@ -8,7 +8,7 @@
  */
 #include "IfStmtRewrite.h"
 
-#define MAX_STMT_NUM 4
+#define MAX_STMT_NUM 1
 
 std::string IfStmtVisitor::getSourceCodeFromStmt(Stmt *s){
     SourceRange srcRange = SourceRange(s->getBeginLoc(), s->getEndLoc());
@@ -95,7 +95,7 @@ void IfStmtVisitor::RewriteIfWithSymmetricalStmt(IfStmt *ifStmt, int maxStmtNum)
     CompoundStmt *thenBody = dyn_cast<CompoundStmt>(ifStmt->getThen());
     CompoundStmt *elseBody = dyn_cast<CompoundStmt>(ifStmt->getElse());
 
-    std::string modifySrc = "";
+    std::string modifySrc = "{";
     auto thenItr = thenBody->body_begin(), thenIe = thenBody->body_end();
     auto elseItr = elseBody->body_begin(), elseIe = elseBody->body_end();
     while((thenItr != thenIe) && (elseItr != elseIe)){
@@ -112,7 +112,7 @@ void IfStmtVisitor::RewriteIfWithSymmetricalStmt(IfStmt *ifStmt, int maxStmtNum)
         thenItr++;
         elseItr++;
     }
-    // modifySrc += "}\n";
+    modifySrc += "}\n";
 
     //We should remove first, then insert to avoid error
     TheRewriter.RemoveText(SourceRange(ifStmt->getBeginLoc(), ifStmt->getEndLoc()));
